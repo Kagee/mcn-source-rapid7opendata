@@ -1,0 +1,12 @@
+#! /usr/bin/env bash
+# Inof / Source: Access to the BigQuery dataset mentioned in https://medium.com/cali-dog-security/retrieving-storing-and-querying-250m-certificates-like-a-boss-31b1ce2dfcf8
+# BigQuery: SELECT all_dns_names FROM [ctl-lists:ctl_data.cert_data] WHERE REGEXP_MATCH( all_dns_names,r'\.no( |$)')
+SOURCE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SOURCE_DIR"
+source config.sh
+
+YM="$(date +"%F")"
+mkdir -p old output
+mv output/* old/
+cat "$RESULT_FOLDER/"* | "$MCN_TOOLS/default_extract" | sort | uniq > "$YM-$DOMAINS"
+mv "$YM-$DOMAINS" "output/$YM-$DOMAINS"
