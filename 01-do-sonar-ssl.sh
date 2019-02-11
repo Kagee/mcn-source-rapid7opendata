@@ -13,8 +13,8 @@ function get_simple_study() {
   2>&1 echo "[INFO] Looking through study $STUDY"
   curl -s -H "X-Api-Key: $API_KEY" "$API/" | \
   jq -r ".[] | select(.uniqid == \"$STUDY\") | .sonarfile_set[] | select(contains(\"_names\"))" | \
-  tac | \
-  grep -v -P '^20(13|14|15|16|17|18)' |\
+  cat| \
+  grep -v -P '^20(13|14|15|16|17|18)|^201901' |\
   while read -r SONARFILE;
     do
       FPF="$(curl -s -H "X-Api-Key: $API_KEY" "$API/$STUDY/$SONARFILE/" | jq -r .fingerprint | tr -dc '[:alnum:]')";
