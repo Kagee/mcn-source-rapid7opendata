@@ -14,7 +14,7 @@ function get_simple_study() {
   curl -s -H "X-Api-Key: $API_KEY" "$API/" | \
   jq -r ".[] | select(.uniqid == \"$STUDY\") | .sonarfile_set[] | select(contains(\"_names\"))" | \
   cat| \
-  grep -v -P '^20(13|14|15|16|17|18)|^201901' |\
+  grep -v -P '^20(13|14|15|16|17|18)|^2019(91|92|93|04)' |\
   while read -r SONARFILE;
     do
       FPF="$(curl -s -H "X-Api-Key: $API_KEY" "$API/$STUDY/$SONARFILE/" | jq -r .fingerprint | tr -dc '[:alnum:]')";
@@ -32,8 +32,22 @@ function get_simple_study() {
           #DL='{"desc":"you've been throttled"}'
           URL="$(echo $DL | jq -r .url)";
           if [ "$URL" == "null" ]; then
-            2>&1 echo "[INFO] We did not get a URL when expected, we are probaly throttled. Gracefully quitting. ($DL)"
-            exit 0;
+            #2>&1 echo "[INFO] We did not get a URL when expected, we are probaly throttled. Gracefully quitting. ($DL)"
+            SECONDS="$(echo "$DL" | jq -r .detail | awk '{match($0,"wait ([0-9]+) seconds",a)}END{if (a[1] != "") {print a[1]}}')"
+            if [ "x$SECONDS" != "x" ]; then
+              2>&1 echo "[INFO] We did not get a URL when expected, we are probaly throttled. Sleeping for requested time ($SECONDS seconds) + 1 hour. ($DL)"
+              sleep 1h;
+              sleep "${SECONDS}s";
+              DL="$(curl -s -H "X-Api-Key: $API_KEY" "$API/$STUDY/$SONARFILE/download/")";
+              URL="$(echo $DL | jq -r .url)";
+              if [ "$URL" == "null" ]; then
+                2>&1 echo "[ERROR] Failed to get URL after sleep, critial failiure! ($DL)";
+                exit 2;
+              fi
+            else
+              2>&1 echo "[ERROR] Failed to parse seconds from error message, quitting! ($DL)";
+               return 1;
+            fi
           fi
           2>&1 echo "[INFO] Downloading $STORAGE_FOLDER/$FPF using $URL ($SONARFILE)"
           wget -q -O "$STORAGE_FOLDER/$FPF" "$URL";
@@ -42,10 +56,11 @@ function get_simple_study() {
         fi
         zcat "$STORAGE_FOLDER/$FPF" | grep -F '.no' | "$MCN_TOOLS/default_extract" > "$RESULT_FOLDER/$FPF.tmp"
         mv "$RESULT_FOLDER/$FPF.tmp" "$RESULT_FOLDER/$FPF"
-        rm "$STORAGE_FOLDER/$FPF" 
+        rm "$STORAGE_FOLDER/$FPF"
       fi
     done;
+    2>&1 echo "[INFO] Done with $STUDY"
+    return 0;
 }
 
-get_simple_study "sonar.ssl"
-get_simple_study "sonar.moressl"
+get_simple_study "sonar.ssl" && get_simple_study "sonar.moressl"
